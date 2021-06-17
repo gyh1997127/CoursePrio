@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
   //timespec timer = tic();
   /* Run kernel. */
   kernel_gemm(C,A,B,1.5,2.5);
-  kernel_gemm_serial_opt(C_ref,A_ref,B_ref,1.5,2.5);
+  //kernel_gemm_serial_opt(C_ref,A_ref,B_ref,1.5,2.5);
   //kernel_gemm_tiled(C_ref, A_ref, B_ref, 1.5, 2.5);
 
   //print_array_sum(C);

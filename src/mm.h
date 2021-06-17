@@ -1,11 +1,10 @@
-#include <algorithm>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NI 2048
-#define NJ 2048
-#define NK 2048
-#define BSize 32
+#define NI 5
+#define NJ 5
+#define NK 5
+#define BSize 1
 #define FACTOR NI/BSize
 
 void kernel_gemm(float C[NI * NJ], float A[NI * NK], float B[NK * NJ], float alpha, float beta);
