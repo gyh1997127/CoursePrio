@@ -1,0 +1,5 @@
+src/*.out
+
+*.log
+
+mm_proj
