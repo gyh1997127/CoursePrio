@@ -7,7 +7,8 @@ open_project mm.prj -reset
 # set the top-level function of the design to be mm
 set_top kernel_gemm
 # add design files
-add_files $SRC_DIR/mm.cpp $SRC_DIR/mm.h
+add_files $SRC_DIR/mm.cpp 
+add_files $SRC_DIR/mm.h
 # add the testbench files
 add_files -tb $SRC_DIR/mm_test.cpp
 # open HLS solution solution1
