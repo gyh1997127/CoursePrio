@@ -1,6 +1,6 @@
 #include "mm.h"
+#include "my_timer.h"
 
-/* Array initialization. */
 static void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
   int i, j;
 
@@ -15,8 +15,6 @@ static void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
       B[i * NJ + j] = (float)(i * (j + 2) % NJ) / NJ;
 }
 
-/* DCE code. Must scan the entire live-out data.
-   Can be used also to check the correctness of the output. */
 static void print_array(float C[NI * NJ]) {
   int i, j;
 
@@ -25,8 +23,6 @@ static void print_array(float C[NI * NJ]) {
       printf("C[%d][%d] = %f\n", i, j, C[i * NJ + j]);
 }
 
-/* DCE code. Must scan the entire live-out data.
-   Can be used also to check the correctness of the output. */
 float print_array_sum(float C[NI * NJ]) {
   int i, j;
 
@@ -40,6 +36,53 @@ float print_array_sum(float C[NI * NJ]) {
   return sum;
 }
 
+static void kernel_gemm_tiled(float C[NI * NJ], float A[NI * NK], float B[NK * NJ], float alpha, float beta) {
+  int i, j, k;
+  int ii, jj, kk;
+  for (i = 0; i < NI; i+=BSize) {
+    for (j = 0; j < NJ; j+=BSize) {
+      for (ii = i; ii < i+BSize; ii++) { // Applying loop tiling to increase cache hits
+        for (jj = j; jj < j+BSize; jj++) {
+          C[ii * NJ + jj] *= beta;
+        }
+      }
+    }
+  }
+
+  for (i = 0; i < NI; i += BSize) {
+    for (k = 0; k < NK; k += BSize) { // changing loop order to I->K->J from I->J->K to exploit
+      for (j = 0; j < NJ; j += BSize) {
+        for (ii = i; ii < i + BSize; ii++) { // Applying loop tiling to increase the cache hits
+          for (kk = k; kk < k + BSize; kk++) { // Loop ordering for inner-most loops is kept as
+            for (jj = j; jj < j + BSize; jj++) {
+              C[ii * NJ + jj] += alpha * A[ii * NK + kk] * B[kk * NJ + jj];
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+static void kernel_gemm_serial_opt(float C[NI * NJ], float A[NI * NK], float B[NK * NJ], float alpha, float beta) {
+  int i, j, k;
+  // => Form C := alpha*A*B + beta*C,
+  // A is NIxNK
+  // B is NKxNJ
+  // C is NIxNJ
+  InitC_i:for (i = 0; i < NI; i++) {
+    InitC_j:for (j = 0; j < NJ; j++) {
+      C[i * NJ + j] *= beta;
+    }
+  }
+  MM_i:for (i = 0; i < NI; i++) {
+    MM_k:for (k = 0; k < NK; ++k) { // re-ordered the loop here to I-K-J for better locality on A,B and C
+      MM_j:for (j = 0; j < NJ; j++) {
+          C[i * NJ + j] += alpha * A[i * NK + k] * B[k * NJ + j];
+      }
+    }
+  }
+}
 
 int main(int argc, char **argv) {
   /* Variable declaration/allocation. */
@@ -47,18 +90,24 @@ int main(int argc, char **argv) {
   float *B = (float *)malloc(NK * NJ * sizeof(float));
   float *C = (float *)malloc(NI * NJ * sizeof(float));
 
+  float *A_ref = (float *)malloc(NI * NK * sizeof(float));
+  float *B_ref = (float *)malloc(NK * NJ * sizeof(float));
+  float *C_ref = (float *)malloc(NI * NJ * sizeof(float));
   /* Initialize array(s). */
   init_array(C, A, B);
+  init_array(C_ref, A_ref, B_ref);
 
+  //timespec timer = tic();
   /* Run kernel. */
   kernel_gemm(C,A,B,1.5,2.5);
-  //kernel_gemm_serial_opt(C,A,B,1.5,2.5);
-  //kernel_gemm_tiled(C, A, B, 1.5, 2.5);
+  kernel_gemm_serial_opt(C_ref,A_ref,B_ref,1.5,2.5);
+  //kernel_gemm_tiled(C_ref, A_ref, B_ref, 1.5, 2.5);
 
-  /* Print results. */
-  //print_array(C);
   //print_array_sum(C);
-  if (print_array_sum(C) == 3212133376.000000) {
+  //print_array_sum(C_ref);
+
+  //toc(&timer, "kernel time");
+  if (print_array_sum(C) == print_array_sum(C_ref)) {
     printf("Passed\n");
     free(A);
     free(B);
@@ -71,4 +120,5 @@ int main(int argc, char **argv) {
     free(C);
     return 1;
   }
+  return 0;
 }
