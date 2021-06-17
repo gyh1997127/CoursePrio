@@ -1,14 +1,15 @@
 #===================================
 # run_hls.tcl for GEMM
 #===================================
+set SRC_DIR src
 # open the HLS project mm.prj
 open_project mm.prj -reset
 # set the top-level function of the design to be mm
-set_top mm
+set_top kernel_gemm
 # add design files
-add_files mm.cpp mm.h
+add_files $SRC_DIR/mm.cpp $SRC_DIR/mm.h
 # add the testbench files
-add_files -tb mm_test.cpp
+add_files -tb $SRC_DIR/mm_test.cpp
 # open HLS solution solution1
 open_solution "solution1"
 # set target FPGA device: Alveo U200 in this example
