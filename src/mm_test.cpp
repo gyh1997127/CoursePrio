@@ -1,7 +1,7 @@
 #include "mm.h"
-#include "my_timer.h"
+//#include "my_timer.h"
 
-static void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
+void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
   int i, j;
 
   for (i = 0; i < NI; i++)
@@ -13,27 +13,6 @@ static void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
   for (i = 0; i < NK; i++)
     for (j = 0; j < NJ; j++)
       B[i * NJ + j] = (float)(i * (j + 2) % NJ) / NJ;
-}
-
-static void print_array(float C[NI * NJ]) {
-  int i, j;
-
-  for (i = 0; i < NI; i++)
-    for (j = 0; j < NJ; j++)
-      printf("C[%d][%d] = %f\n", i, j, C[i * NJ + j]);
-}
-
-float print_array_sum(float C[NI * NJ]) {
-  int i, j;
-
-  float sum = 0.0;
-
-  for (i = 0; i < NI; i++)
-    for (j = 0; j < NJ; j++)
-      sum += C[i * NJ + j];
-
-  printf("sum of C array = %f\n", sum);
-  return sum;
 }
 
 static void kernel_gemm_tiled(float C[NI * NJ], float A[NI * NK], float B[NK * NJ], float alpha, float beta) {
@@ -108,7 +87,7 @@ int main(int argc, char **argv) {
 
   //toc(&timer, "kernel time");
   if (print_array_sum(C) == print_array_sum(C_ref)) {
-    printf("Passed\n");
+    std::cout << "passed\n";
     free(A);
     free(B);
     free(C);

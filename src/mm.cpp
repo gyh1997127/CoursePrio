@@ -1,4 +1,27 @@
 #include "mm.h"
+//#include <stdio.h>
+
+void print_array(float C[NI * NJ]) {
+  int i, j;
+
+  for (i = 0; i < NI; i++)
+    for (j = 0; j < NJ; j++)
+      printf("C[%d][%d] = %f\n", i, j, C[i * NJ + j]);
+}
+
+float print_array_sum(float C[NI * NJ]) {
+  int i, j;
+
+  float sum = 0.0;
+
+  for (i = 0; i < NI; i++)
+    for (j = 0; j < NJ; j++)
+      sum += C[i * NJ + j];
+
+  printf("sum of C array = %f\n", sum);
+  return sum;
+}
+
 void kernel_gemm(float C[NI * NJ], float A[NI * NK], float B[NK * NJ],
                  float alpha, float beta) {
 #ifdef HLS
@@ -27,6 +50,16 @@ void kernel_gemm(float C[NI * NJ], float A[NI * NK], float B[NK * NJ],
   //    }
   //  }
   //}
+  print_array(A);
+
+MM_i:
+  for (i = 0; i < NI; i++) {
+  MM_k:
+    for (k = 0; k < NK; ++k) {
+      C[i * NJ + k] *= beta;
+    }
+  }
+
 
 K:
   for (k = 0; k < NK; k++) {
@@ -34,11 +67,14 @@ K:
     for (i = 0; i < NI; i++) {
     J:
       for (j = 0; j < NJ; j++) {
-        int last = (k == 0) ? C[i * NJ + j] * beta : C[i * NJ + j];
+        float last = (k == 0) ? 0 : C[i * NJ + j];
         // update new sum
-        int a_val = (i < NI && k < NK) ? A[i * NK + k] : 0;
-        int b_val = (k < NK && j < NJ) ? B[k * NJ + j] : 0;
-        int temp = alpha * a_val * b_val;
+        float a_val = (i < NI && k < NK) ? A[i * NK + k] : 0;
+        float b_val = (k < NK && j < NJ) ? B[k * NJ + j] : 0;
+        float temp = alpha * a_val * b_val + last;
+        std::cout << "aval[" << (i * NK + k) << "]:" << a_val 
+                  << "\tbval[" << (k * NJ + j) << "]:" << b_val
+                  << "\ttemp:" << temp << std::endl;
         // update C
         C[i * NJ + j] = temp;
       }
