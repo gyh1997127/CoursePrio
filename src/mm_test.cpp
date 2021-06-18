@@ -45,6 +45,9 @@ static void kernel_gemm_tiled(float C[NI * NJ], float A[NI * NK], float B[NK * N
 
 static void kernel_gemm_serial_opt(float C[NI * NJ], float A[NI * NK], float B[NK * NJ], float alpha, float beta) {
   int i, j, k;
+  std::cout << "serial opted\n";
+  print_array(A);
+  print_array(B);
   // => Form C := alpha*A*B + beta*C,
   // A is NIxNK
   // B is NKxNJ
@@ -76,17 +79,17 @@ int main(int argc, char **argv) {
   init_array(C, A, B);
   init_array(C_ref, A_ref, B_ref);
 
-  //timespec timer = tic();
   /* Run kernel. */
   kernel_gemm(C,A,B,1.5,2.5);
-  //kernel_gemm_serial_opt(C_ref,A_ref,B_ref,1.5,2.5);
+  print_array(C);
+  float kernel_sum = print_array_sum(C);
+
+  kernel_gemm_serial_opt(C_ref,A_ref,B_ref,1.5,2.5);
   //kernel_gemm_tiled(C_ref, A_ref, B_ref, 1.5, 2.5);
+  print_array(C_ref);
+  float ref_sum = print_array_sum(C_ref);
 
-  //print_array_sum(C);
-  //print_array_sum(C_ref);
-
-  //toc(&timer, "kernel time");
-  if (print_array_sum(C) == print_array_sum(C_ref)) {
+  if (kernel_sum == ref_sum) {
     std::cout << "passed\n";
     free(A);
     free(B);

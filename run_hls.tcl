@@ -19,7 +19,7 @@ set_part {xcu200-fsgd2104-2-e}
 create_clock -period 5
 
 # do a c simulation
-csim_design
+#csim_design
 # synthesize the design
 csynth_design
 # do a co-simulation
