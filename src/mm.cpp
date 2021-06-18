@@ -27,30 +27,34 @@ float print_array_sum(float C[NI * NJ]) {
 void kernel_gemm(float C[NI * NJ], float A[NI * NK], float B[NK * NJ],
                  float alpha, float beta) {
 #pragma HLS ARRAY_PARTITION variable = C dim = 1 block  factor = 64
-#pragma HLS ARRAY_PARTITION variable = A dim = 1 block factor = 64
+#pragma HLS ARRAY_PARTITION variable = A dim = 1 block  factor = 64
 #pragma HLS ARRAY_PARTITION variable = B dim = 1 cyclic factor = 64
+#pragma HLS ARRAY_PARTITION variable = temp_sum complete
 #pragma HLS dataflow
 #ifndef __SYNTHESIS__
   std::cout << "kernel_gemm\n";
 #endif
   int i, j, k;
   float temp_sum[NJ] = {0};
-  print_array(A);
-  print_array(B);
+#ifndef __SYNTHESIS__
+  //print_array(A);
+  //print_array(B);
+#endif
 
    //=> Form C := alpha*A*B + beta*C,
    //A is NIxNK
    //B is NKxNJ
    //C is NIxNJ
   InitC_i:for (i = 0; i < NI; i++) {
+    #pragma HLS pipeline II=1
     InitC_j:for (j = 0; j < NJ; j++) {
+      #pragma HLS loop_flatten
       C[i * NJ + j] *= beta;
     }
   }
-  print_array(C);
   MM_i:for (i = 0; i < NI; i++) {
    MM_k:for (k = 0; k < NK; k++) {
-     #pragma HLS unroll factor=64
+     #pragma HLS unroll
      MM_j:for (j = 0; j < NJ; j++) {
        #pragma HLS PIPELINE II=1
        float result = (k==0) ? 0 : temp_sum[j];
