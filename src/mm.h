@@ -1,7 +1,7 @@
 
-#define NI 2048
-#define NJ 2048
-#define NK 2048
+#define NI 1024
+#define NJ 1024
+#define NK 1024
 //Standard Libraries
 #include <stdio.h>
 #include <stdlib.h>

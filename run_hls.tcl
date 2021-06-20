@@ -21,7 +21,7 @@ create_clock -period 3.333334
 # do a c simulation
 #csim_design
 # synthesize the design
-#csynth_design
+csynth_design
 # do a co-simulation
 cosim_design
 # close project and quit
