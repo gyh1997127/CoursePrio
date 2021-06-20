@@ -16,7 +16,7 @@ open_solution "solution1"
 # set target FPGA device: Alveo U200 in this example
 set_part {xcu200-fsgd2104-2-e}
 # target clock period is 5 ns, i.e., 200MHz
-create_clock -period 5
+create_clock -period 3.333334
 
 # do a c simulation
 #csim_design
