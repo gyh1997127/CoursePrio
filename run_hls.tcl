@@ -1,7 +1,7 @@
 #===================================
 # run_hls.tcl for GEMM
 #===================================
-set SRC_DIR src
+set SRC_DIR ./src
 # open the HLS project mm.prj
 open_project mm.prj -reset
 # set the top-level function of the design to be mm

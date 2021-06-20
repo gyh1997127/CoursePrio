@@ -1,5 +1,27 @@
-#include "mm.h"
-//#include "my_timer.h"
+#include "mm_test.h"
+
+void print_array(float C[NI * NJ]) {
+  int i, j;
+
+  for (i = 0; i < NI; i++)
+    //for (j = 0; j < NJ; j++)
+      //printf("C[%d][%d] = %f\n", i, j, C[i * NJ + j]);
+      printf("%f, %f, %f\n", C[i*NJ+0], C[i*NJ+1], C[i*NJ+2]);
+  printf("\n");
+}
+
+float print_array_sum(float C[NI * NJ]) {
+  int i, j;
+
+  float sum = 0.0;
+
+  for (i = 0; i < NI; i++)
+    for (j = 0; j < NJ; j++)
+      sum += C[i * NJ + j];
+
+  printf("sum of C array = %f\n", sum);
+  return sum;
+}
 
 void init_array(float C[NI * NJ], float A[NI * NK], float B[NK * NJ]) {
   int i, j;
