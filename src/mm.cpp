@@ -3,17 +3,11 @@
 #include <iostream>
 #endif
 
+
+
 //0.564
 void kernel_gemm(float C[NI * NJ], float A[NI * NK], float B[NK * NJ],
                  float alpha, float beta) {
-  //#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmem
-  //#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmem
-  //#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmem
-  //#pragma HLS INTERFACE s_axilite port=A bundle=control
-  //#pragma HLS INTERFACE s_axilite port=B bundle=control
-  //#pragma HLS INTERFACE s_axilite port=C bundle=control
-  //#pragma HLS INTERFACE s_axilite port=return bundle=control
-
   TYPE local_A[tile_size][tile_size];
   #pragma HLS ARRAY_PARTITION variable = local_A complete dim = 2
   TYPE local_B[tile_size][tile_size];
@@ -37,15 +31,7 @@ ROW_PARTITION_L:
 
     LOAD_AB_AND_COMPUTE:
       for (int k = 0; k < col_size; k += tile_size) {
-        //#pragma HLS loop_flatten off
-      //LOAD_INIT_TILE_A:
-        //for (int ii = 0; ii < tile_size; ii++)
-          //for (int kk = 0; kk < tile_size; kk++)
-            //#pragma HLS PIPELINE
-            //#pragma HLS loop_flatten 
-            //local_A[ii][kk] = alpha * A[(i + ii) * col_size + (k + kk)];
-
-      LOAD:
+        LOAD:
         for (int kk = 0; kk < tile_size; kk++) {
         #pragma HLS dataflow
         //#pragma HLS PIPELINE
@@ -77,3 +63,7 @@ ROW_PARTITION_L:
     }
   return;
 }
+
+
+
+
