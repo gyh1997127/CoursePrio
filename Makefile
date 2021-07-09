@@ -14,7 +14,7 @@ run: imgBlur
 	./imgBlur -e golden_output.ppm -i input.ppm -o output.ppm -t image
 
 debug: imgBlur
-	cuda-gdb --args ./imgBlur -e golden_output.ppm -i input.ppm -o output.ppm -t image
+	cuda-gdb -tui --args ./imgBlur -e golden_output.ppm -i input.ppm -o output.ppm -t image
 
 memcheck: imgBlur
 	cuda-memcheck ./imgBlur -e golden_output.ppm -i input.ppm -o output.ppm -t image

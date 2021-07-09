@@ -42,8 +42,8 @@ __global__ void blurKernel(float *out, float *in, int width, int height) {
   }
 #else
 __global__ void blurKernel(float *out, float *in, int width, int height) {
-  int Col = blockIdx.x * TILE_W + threadIdx.x; // - BLUR_SIZE;
-  int Row = blockIdx.y * TILE_H + threadIdx.y; // - BLUR_SIZE;
+  int Col = blockIdx.x * TILE_W + threadIdx.x - BLUR_SIZE;
+  int Row = blockIdx.y * TILE_H + threadIdx.y - BLUR_SIZE;
   int idx = Row * width + Col;
 
   __shared__ float smem[BLOCK_W][BLOCK_H];
