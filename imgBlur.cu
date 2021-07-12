@@ -10,62 +10,101 @@
     }                                                                          \
   } while (0)
 
-#define BLUR_SIZE 10
-#define TILE_W 8
-#define TILE_H 16
-#define BLOCK_W (TILE_W + (2 * BLUR_SIZE))
-#define BLOCK_H (TILE_H + (2 * BLUR_SIZE))
-#define FILTER_W (BLUR_SIZE * 2 + 1)
-#define FILTER_H (BLUR_SIZE * 2 + 1)
-#define USE_SHARED_MEM
+#define BLUR_SIZE 21
+#define nthreads 64
 
 ///////////////////////////////////////////////////////
-//@@ INSERT YOUR CODE HERE
-#ifndef USE_SHARED_MEM
-__global__ void blurKernel(float *out, float *in, int width, int height) {
-  int Col = blockIdx.x * blockDim.x + threadIdx.x;
-  int Row = blockIdx.y * blockDim.y + threadIdx.y;
-  if (Col < width && Row < height) {
-    float pixVal = 0;
-    float pixels = 0;
-    for (int blurRow = -BLUR_SIZE; blurRow < BLUR_SIZE + 1; ++blurRow) {
-      for (int blurCol = -BLUR_SIZE; blurCol < BLUR_SIZE + 1; ++blurCol) {
-        int curRow = Row + blurRow;
-        int curCol = Col + blurCol;
-        if (curRow > -1 && curRow < height && curCol > -1 && curCol < width) {
-          pixVal += in[curRow * width + curCol];
-          pixels++;
-        }
-      }
-    }
-    out[Row * width + Col] = (pixVal / pixels);
-  }
-#else
-__global__ void blurKernel(float *out, float *in, int width, int height) {
-  int Col = blockIdx.x * TILE_W + threadIdx.x - BLUR_SIZE;
-  int Row = blockIdx.y * TILE_H + threadIdx.y - BLUR_SIZE;
-  int idx = Row * width + Col;
+__device__ void blur_x(float *out, float *in, int width, int height) {
+  int r = BLUR_SIZE;
+  float scale = 1.0 / (float)((r << 1) + 1); // 1/(2r+1)
 
-  __shared__ float smem[BLOCK_W][BLOCK_H];
-  int in_bound = Col >= 0 && Row >= 0 && Col <= width && Row <= height; 
-  smem[threadIdx.x][threadIdx.y] = in_bound ? in[idx] : 0;
-  __syncthreads();
+  /////////////////////
+  // col [0, BLUR_SIZE]
+  float t;
+  t = in[0] * r; // padding with in[0]
 
-  // some of the loading threads don't participate in compute
-  if (threadIdx.x >= BLUR_SIZE && threadIdx.x < BLOCK_W - BLUR_SIZE &&
-      threadIdx.y >= BLUR_SIZE && threadIdx.y < BLOCK_H - BLUR_SIZE) {
-    float pixVal = 0;
-    int pixels = 0;
-    for (int x = -BLUR_SIZE; x < BLUR_SIZE + 1; x++) {
-      for (int y = -BLUR_SIZE; y < BLUR_SIZE + 1; y++) {
-        pixVal += smem[threadIdx.x + x][threadIdx.y + y];
-        pixels++;
-      }
-    }
-    out[Row * width + Col] = (pixVal / pixels);
+  // accumulate BLUR_SIZE pixels to in[0]'s right
+  // and average out
+  for (int x = 0; x < (r + 1); x++) {
+    t += in[x];
   }
-#endif
+  out[0] = t * scale;
+
+  // take care of 0<x<BLUR_SIZE+1
+  for (int x = 1; x < (r + 1); x++) {
+    t += in[x + r];
+    t -= in[0];  
+    out[x] = t * scale;
+  }
+
+  /////////////////////
+  // col [BLUR_SIZE+1, width-BLURSIZE]
+  for (int x = (r + 1); x < width - r; x++) {
+    t += in[x + r];
+    t -= in[x - r - 1];
+    out[x] = t * scale;
+  }
+
+  /////////////////////
+  // col [width-BLURSIZE, width]
+  for (int x = width - r; x < width; x++) {
+    t += in[width - 1]; // padding with in[w-1]
+    t -= in[x - r - 1];
+    out[x] = t * scale;
+  }
 }
+
+__device__ void blur_y(float *out, float *in, int width, int height) {
+  int r = BLUR_SIZE;
+  float scale = 1.0 / (float)((r << 1) + 1); // 1/(2r+1)
+
+  /////////////////////
+  // row [0, BLUR_SIZE]
+  float t;
+  t = in[0] * r; // padding with in[0]
+
+  // accumulate BLUR_SIZE pixels to in[0]'s top
+  // and average out
+  for (int y = 0; y < (r + 1); y++) {
+    t += in[y + width];
+  }
+  out[0] = t * scale;
+
+  // take care of 0<y<BLUR_SIZE+1
+  for (int y = 1; y < (r + 1); y++) {
+    t += in[(y + r) * width];
+    t -= in[0];
+    out[y * width] = t * scale;
+  }
+
+  /////////////////////
+  // row [BLUR_SIZE+1, width-BLURSIZE]
+  for (int y = (r + 1); y < height - r; y++) {
+    t += in[(y + r) * width];
+    t -= in[(y - r) * width - width];
+    out[y * width] = t * scale;
+  }
+
+  /////////////////////
+  // row [width-BLURSIZE, width]
+  for (int y = height - r; y < height; y++) {
+    t += in[(height - 1) * width]; // padding with in[h-1]
+    t -= in[(y - r) * width - width];
+    out[y * width] = t * scale;
+  }
+}
+
+__global__ void blurKernel_x(float *out, float *in, int width, int height) {
+  int y = blockIdx.x * blockDim.x + threadIdx.x;
+  // accessing by row -> insufficient
+  blur_x(&out[y * width], &in[y * width], width, height);
+}
+
+__global__ void blurKernel_y(float *out, float *in, int width, int height) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  blur_y(&out[x], &in[x], width, height);
+}
+
 ///////////////////////////////////////////////////////
 
 int main(int argc, char *argv[]) {
@@ -79,7 +118,7 @@ int main(int argc, char *argv[]) {
   float *hostOutputImageData;
   float *deviceInputImageData;
   float *deviceOutputImageData;
-
+  float *deviceTempImageData;
   args = wbArg_read(argc, argv); /* parse the input arguments */
 
   inputImageFile = wbArg_getInputFile(args, 0);
@@ -101,34 +140,34 @@ int main(int argc, char *argv[]) {
   timespec timer = tic();
 
   ///////////////////////////////////////////////////////
-  //@@ INSERT AND UPDATE YOUR CODE HERE
-
   // Allocate cuda memory for device input and ouput image data
   cudaMalloc((void **)&deviceInputImageData,
              imageWidth * imageHeight * sizeof(float));
   cudaMalloc((void **)&deviceOutputImageData,
+             imageWidth * imageHeight * sizeof(float));
+  cudaMalloc((void **)&deviceTempImageData,
              imageWidth * imageHeight * sizeof(float));
 
   // Transfer data from CPU to GPU
   cudaMemcpy(deviceInputImageData, hostInputImageData,
              imageWidth * imageHeight * sizeof(float), cudaMemcpyHostToDevice);
 
-#ifndef USE_SHARED_MEM
-  printf("NOT using shared memory\n");
-  dim3 threadsPerBlock(TILE_W, TILE_H);
-  dim3 blocksPerGrid(imageWidth / TILE_W, imageHeight / TILE_H);
-#else
-  printf("using shared memory\n");
-  dim3 threadsPerBlock(BLOCK_W, BLOCK_H);
-  dim3 blocksPerGrid(imageWidth / TILE_W + 1, imageHeight / TILE_H + 1);
-#endif
   // Call your GPU kernel 10 times
-  for (int i = 0; i < 1; i++)
-    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
-           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
-           threadsPerBlock.y);
-  blurKernel<<<blocksPerGrid, threadsPerBlock>>>(
-      deviceOutputImageData, deviceInputImageData, imageWidth, imageHeight);
+  for (int i = 0; i < 1; i++) {
+    dim3 threadsPerBlock(nthreads);
+    // horizontal pass
+    {
+      dim3 blocksPerGrid(imageHeight / nthreads + 1);
+      blurKernel_x<<<blocksPerGrid, threadsPerBlock>>>(
+          deviceTempImageData, deviceInputImageData, imageWidth, imageHeight);
+    }
+     //vertical pass
+    {
+      dim3 blocksPerGrid(imageWidth / nthreads + 1);
+      blurKernel_y<<<blocksPerGrid, threadsPerBlock>>>(
+          deviceOutputImageData, deviceTempImageData, imageWidth, imageHeight);
+    }
+  }
 
   // Transfer data from GPU to CPU
   cudaMemcpy(hostOutputImageData, deviceOutputImageData,
