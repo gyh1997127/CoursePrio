@@ -11,7 +11,9 @@
   } while (0)
 
 #define BLUR_SIZE 21
-#define nthreads 16
+//#define nthreads 16
+#define X_NTHREADS 4
+#define Y_NTHREADS 7
 
 ///////////////////////////////////////////////////////
 __device__ void blur_x(float *out, float *in, int width, int height) {
@@ -96,13 +98,14 @@ __device__ void blur_y(float *out, float *in, int width, int height) {
 
 __global__ void blurKernel_x(float *out, float *in, int width, int height) {
   int y = blockIdx.x * blockDim.x + threadIdx.x;
-  // accessing by row -> insufficient
+  extern __shared__ float SMEM_X[];
   if (y < height)
     blur_x(&out[y * width], &in[y * width], width, height);
 }
 
 __global__ void blurKernel_y(float *out, float *in, int width, int height) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;
+  extern __shared__ float SMEM_Y[];
   if (x < width)
     blur_y(&out[x], &in[x], width, height);
 }
@@ -155,25 +158,28 @@ int main(int argc, char *argv[]) {
              imageWidth * imageHeight * sizeof(float), cudaMemcpyHostToDevice);
 
   // Call your GPU kernel 10 times
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     printf("Iteration %d\n", i);
-    dim3 threadsPerBlock(nthreads);
     // horizontal pass
     {
+      int nthreads = X_NTHREADS;
+      dim3 threadsPerBlock(nthreads);
       dim3 blocksPerGrid(imageHeight / nthreads + 1);
       printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
            blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
            threadsPerBlock.y);
-      blurKernel_x<<<blocksPerGrid, threadsPerBlock>>>(
+      blurKernel_x<<<blocksPerGrid, threadsPerBlock, 0*imageWidth*sizeof(float)>>>(
           deviceTempImageData, deviceInputImageData, imageWidth, imageHeight);
     }
      //vertical pass
     {
+      int nthreads = Y_NTHREADS;
+      dim3 threadsPerBlock(nthreads);
       dim3 blocksPerGrid(imageWidth / nthreads + 1);
       printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
            blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
            threadsPerBlock.y);
-      blurKernel_y<<<blocksPerGrid, threadsPerBlock>>>(
+      blurKernel_y<<<blocksPerGrid, threadsPerBlock, 0*imageHeight*sizeof(float)>>>(
           deviceOutputImageData, deviceTempImageData, imageWidth, imageHeight);
     }
   }
@@ -190,6 +196,7 @@ int main(int argc, char *argv[]) {
 
   cudaFree(deviceInputImageData);
   cudaFree(deviceOutputImageData);
+  cudaFree(deviceTempImageData);
 
   wbImage_delete(outputImage);
   wbImage_delete(inputImage);
