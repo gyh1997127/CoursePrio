@@ -147,12 +147,15 @@ int main(int argc, char *argv[]) {
 
   ///////////////////////////////////////////////////////
   // Allocate cuda memory for device input and ouput image data
-  cudaMalloc((void **)&deviceInputImageData,
-             imageWidth * imageHeight * sizeof(float));
-  cudaMalloc((void **)&deviceOutputImageData,
-             imageWidth * imageHeight * sizeof(float));
-  cudaMalloc((void **)&deviceTempImageData,
-             imageWidth * imageHeight * sizeof(float));
+  cudaHostAlloc((void **)&deviceInputImageData,
+             imageWidth * imageHeight * sizeof(float), 
+             cudaHostAllocDefault);
+  cudaHostAlloc((void **)&deviceOutputImageData,
+             imageWidth * imageHeight * sizeof(float), 
+             cudaHostAllocDefault);
+  cudaHostAlloc((void **)&deviceTempImageData,
+             imageWidth * imageHeight * sizeof(float), 
+             cudaHostAllocDefault);
 
   // Transfer data from CPU to GPU
   cudaMemcpy(deviceInputImageData, hostInputImageData,
@@ -195,9 +198,9 @@ int main(int argc, char *argv[]) {
   // Check the correctness of your solution
   wbSolution(args, outputImage);
 
-  cudaFree(deviceInputImageData);
-  cudaFree(deviceOutputImageData);
-  cudaFree(deviceTempImageData);
+  cudaFreeHost(deviceInputImageData);
+  cudaFreeHost(deviceOutputImageData);
+  cudaFreeHost(deviceTempImageData);
 
   wbImage_delete(outputImage);
   wbImage_delete(inputImage);
