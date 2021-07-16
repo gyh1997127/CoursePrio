@@ -11,8 +11,8 @@
   } while (0)
 
 #define BLUR_SIZE 21
-#define X_NTHREADS 512
-#define Y_NTHREADS 512
+#define X_NTHREADS 128
+#define Y_NTHREADS 16
 #define FILTER_SIZE 1.0 / (float)((BLUR_SIZE << 1) + 1)
 
 ///////////////////////////////////////////////////////
@@ -111,9 +111,9 @@ void blurKernel(float *out, float *in, float *temp, int imageWidth,
     int nthreads = X_NTHREADS;
     dim3 threadsPerBlock(nthreads);
     dim3 blocksPerGrid(imageHeight / nthreads + 1);
-    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
-           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
-           threadsPerBlock.y);
+//    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
+//           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
+//           threadsPerBlock.y);
     blurKernel_x<<<blocksPerGrid, threadsPerBlock>>>(temp, in, imageWidth,
                                                      imageHeight);
   }
@@ -122,9 +122,9 @@ void blurKernel(float *out, float *in, float *temp, int imageWidth,
     int nthreads = Y_NTHREADS;
     dim3 threadsPerBlock(nthreads);
     dim3 blocksPerGrid(imageWidth / nthreads + 1);
-    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
-           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
-           threadsPerBlock.y);
+//    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
+//           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
+//           threadsPerBlock.y);
     blurKernel_y<<<blocksPerGrid, threadsPerBlock>>>(out, temp, imageWidth,
                                                      imageHeight);
   }
@@ -157,6 +157,10 @@ int main(int argc, char *argv[]) {
   printf("imageWidth, imageHeight = (%d, %d)\n", imageWidth, imageHeight);
   // Since the image is monochromatic, it only contains only one channel
   outputImage = wbImage_new(imageWidth, imageHeight, 1);
+  
+  // Use pinned memory on host
+  cudaHostAlloc((void **)&hostInputImageData, imageWidth * imageHeight * sizeof(float), cudaHostAllocDefault);
+  cudaHostAlloc((void **)&hostOutputImageData, imageWidth * imageHeight * sizeof(float), cudaHostAllocDefault);
 
   // Get host input and output image data
   hostInputImageData = wbImage_getData(inputImage);
