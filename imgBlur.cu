@@ -11,14 +11,12 @@
   } while (0)
 
 #define BLUR_SIZE 21
-#define X_NTHREADS 128
-#define Y_NTHREADS 16
+#define X_NTHREADS 64
+#define Y_NTHREADS 135
 #define FILTER_SIZE 1.0 / (float)((BLUR_SIZE << 1) + 1)
 
 ///////////////////////////////////////////////////////
 __device__ void blur_x(float *out, float *in, int width, int height) {
-
-  /////////////////////
   // col [0, BLUR_SIZE]
   float sum;
   sum = in[0] * BLUR_SIZE; // padding with in[0]
@@ -110,7 +108,7 @@ void blurKernel(float *out, float *in, float *temp, int imageWidth,
   {
     int nthreads = X_NTHREADS;
     dim3 threadsPerBlock(nthreads);
-    dim3 blocksPerGrid(imageHeight / nthreads + 1);
+    dim3 blocksPerGrid(imageHeight / nthreads );
 //    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
 //           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
 //           threadsPerBlock.y);
@@ -121,7 +119,7 @@ void blurKernel(float *out, float *in, float *temp, int imageWidth,
   {
     int nthreads = Y_NTHREADS;
     dim3 threadsPerBlock(nthreads);
-    dim3 blocksPerGrid(imageWidth / nthreads + 1);
+    dim3 blocksPerGrid(imageWidth / nthreads );
 //    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
 //           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
 //           threadsPerBlock.y);
@@ -200,9 +198,9 @@ int main(int argc, char *argv[]) {
   // Check the correctness of your solution
   wbSolution(args, outputImage);
 
-  cudaFree(deviceInputImageData);
-  cudaFree(deviceOutputImageData);
-  cudaFree(deviceTempImageData);
+  cudaFreeHost(deviceInputImageData);
+  cudaFreeHost(deviceOutputImageData);
+  cudaFreeHost(deviceTempImageData);
 
   wbImage_delete(outputImage);
   wbImage_delete(inputImage);
