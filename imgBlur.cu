@@ -11,58 +11,44 @@
   } while (0)
 
 #define BLUR_SIZE 21
-#define X_NTHREADS 16
-#define HORIZONTAL_PASS_THREAD 32
+#define X_NTHREADS 64
 #define Y_NTHREADS 135
 #define FILTER_SIZE 1.0 / (float)((BLUR_SIZE << 1) + 1)
+
 ///////////////////////////////////////////////////////
-__device__ void blur_x(int x, float *out, float *in, int width, int height) {
-  // initial sum for different scenarios
-  float sum = 0.0;
-  // 0 <= x < Blur_size+1
-  if (x < (BLUR_SIZE + 1)) {
-    int padd_count = BLUR_SIZE - x;
-    sum = in[0] * padd_count;
-    for (int col = x; col < (BLUR_SIZE * 2 + 1 - padd_count); col++) {
-      sum += in[col];
-    }
-    out[x] = sum * FILTER_SIZE;
+__device__ void blur_x(float *out, float *in, int width, int height) {
+  // col [0, BLUR_SIZE]
+  float sum;
+  sum = in[0] * BLUR_SIZE; // padding with in[0]
+
+  // accumulate BLUR_SIZE pixels to in[0]'s right
+  // and average out
+  for (int col = 0; col < (BLUR_SIZE + 1); col++) {
+    sum += in[col];
   }
-  // Blur_size+1 <= x < width - blur_size
-  else if (x >= (BLUR_SIZE + 1) && x < (width - BLUR_SIZE)) {
-    for (int col = (x - BLUR_SIZE); col < (x + BLUR_SIZE + 1); col++) {
-      sum += in[col];
-    }
-    out[x] = sum * FILTER_SIZE;
-  }
-  // width-blursize <= x < width
-  else if (x >= (width - BLUR_SIZE)) {
-    int padd_count = x - (width - BLUR_SIZE - 1);
-    sum = in[width - 1] * padd_count;
-    for (int col = x; col < (BLUR_SIZE * 2 + 1 - padd_count); col++) {
-      sum += in[col];
-    }
-    out[x] = sum * FILTER_SIZE;
+  out[0] = sum * FILTER_SIZE;
+
+  // take care of 0<col<BLUR_SIZE+1
+  for (int col = 1; col < (BLUR_SIZE + 1); col++) {
+    sum += in[col + BLUR_SIZE];
+    sum -= in[0];
+    out[col] = sum * FILTER_SIZE;
   }
 
-  for (int i = 1; i < width/HORIZONTAL_PASS_THREAD + 1; i++) {
-    int col = x + i;
-    if (col > width) return;
-    if (col < (BLUR_SIZE + 1)) {
-      sum += in[col];
-      sum -= in[0];
-      out[col] = sum * FILTER_SIZE;
-    }
-    if (col >= (BLUR_SIZE + 1) && (col < width - BLUR_SIZE)) {
-      sum += in[col + BLUR_SIZE];
-      sum -= in[col - BLUR_SIZE - 1];
-      out[col] = sum * FILTER_SIZE;
-    }
-    if (col >= (width - BLUR_SIZE) && col < width) {
-      sum += in[width - 1];
-      sum -= in[col - BLUR_SIZE - 1];
-      out[col] = sum * FILTER_SIZE;
-    }
+  /////////////////////
+  // col [BLUR_SIZE+1, width-BLURSIZE]
+  for (int col = (BLUR_SIZE + 1); col < width - BLUR_SIZE; col++) {
+    sum += in[col + BLUR_SIZE];
+    sum -= in[col - BLUR_SIZE - 1];
+    out[col] = sum * FILTER_SIZE;
+  }
+
+  /////////////////////
+  // col [width-BLURSIZE, width]
+  for (int col = width - BLUR_SIZE; col < width; col++) {
+    sum += in[width - 1]; // padding with in[w-1]
+    sum -= in[col - BLUR_SIZE - 1];
+    out[col] = sum * FILTER_SIZE;
   }
 }
 
@@ -105,14 +91,9 @@ __device__ void blur_y(float *out, float *in, int width, int height) {
 }
 
 __global__ void blurKernel_x(float *out, float *in, int width, int height) {
-  int Col = blockIdx.x * blockDim.x + threadIdx.x;
-  int Row = blockIdx.y * blockDim.y + threadIdx.y;
-  int pixel_per_thread = (width)/HORIZONTAL_PASS_THREAD;// + 1;
-  if (pixel_per_thread * Col < width && Row < height) {
-    int start_idx_x = Col * pixel_per_thread; 
-    blur_x(Col * pixel_per_thread, &out[Row * width + Col],
-           &in[Row * width + Col], width, height);
-  }
+  int Row = blockIdx.x * blockDim.x + threadIdx.x;
+  if (Row < height)
+    blur_x(&out[Row * width], &in[Row * width], width, height);
 }
 
 __global__ void blurKernel_y(float *out, float *in, int width, int height) {
@@ -126,11 +107,11 @@ void blurKernel(float *out, float *in, float *temp, int imageWidth,
   // horizontal pass
   {
     int nthreads = X_NTHREADS;
-    dim3 threadsPerBlock(HORIZONTAL_PASS_THREAD, nthreads);
-    dim3 blocksPerGrid(imageWidth/HORIZONTAL_PASS_THREAD + 1, imageHeight / nthreads);
-    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
-           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
-           threadsPerBlock.y);
+    dim3 threadsPerBlock(nthreads);
+    dim3 blocksPerGrid(imageHeight / nthreads );
+//    printf("CUDA kernel launch with [%d %d] blocks of [%d %d] threads\n",
+//           blocksPerGrid.x, blocksPerGrid.y, threadsPerBlock.x,
+//           threadsPerBlock.y);
     blurKernel_x<<<blocksPerGrid, threadsPerBlock>>>(temp, in, imageWidth,
                                                      imageHeight);
   }
@@ -202,7 +183,7 @@ int main(int argc, char *argv[]) {
              imageWidth * imageHeight * sizeof(float), cudaMemcpyHostToDevice);
 
   // Call your GPU kernel 10 times
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     blurKernel(deviceOutputImageData, deviceInputImageData, deviceTempImageData,
                imageWidth, imageHeight);
   }
